@@ -31,3 +31,8 @@ def assert_labelfile_sanity(filename):
         for x, y in shape["points"]:
             assert 0 <= x <= W
             assert 0 <= y <= H
+
+
+if __name__ == '__main__':
+    json_path = r'C:\Users\huxy\Pictures\1000.json'
+    assert_labelfile_sanity(json_path)

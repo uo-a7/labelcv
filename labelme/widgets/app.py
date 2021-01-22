@@ -13,11 +13,11 @@ from qtpy.QtCore import Qt
 from qtpy import QtGui
 from qtpy import QtWidgets
 
-from labelme import __appname__
+from labelme import __app_name__
 from labelme import PY2
 from labelme import QT5
 
-from . import utils
+from labelme import utils
 from labelme.config import get_config
 from labelme.label_file import LabelFile
 from labelme.label_file import LabelFileError
@@ -50,44 +50,24 @@ class MainWindow(QtWidgets.QMainWindow):
 
     FIT_WINDOW, FIT_WIDTH, MANUAL_ZOOM = 0, 1, 2
 
-    def __init__(
-        self,
-        config=None,
-        filename=None,
-        output=None,
-        output_file=None,
-        output_dir=None,
-    ):
-        if output is not None:
-            logger.warning(
-                "argument output is deprecated, use output_file instead"
-            )
-            if output_file is None:
-                output_file = output
-
-        # see labelme/config/default_config.yaml for valid configuration
-        if config is None:
-            config = get_config()
-        self._config = config
+    def __init__(self):
+        self._config = get_config()
 
         # set default shape colors
         Shape.line_color = QtGui.QColor(*self._config["shape"]["line_color"])
         Shape.fill_color = QtGui.QColor(*self._config["shape"]["fill_color"])
-        Shape.select_line_color = QtGui.QColor(
-            *self._config["shape"]["select_line_color"]
-        )
-        Shape.select_fill_color = QtGui.QColor(
-            *self._config["shape"]["select_fill_color"]
-        )
-        Shape.vertex_fill_color = QtGui.QColor(
-            *self._config["shape"]["vertex_fill_color"]
-        )
-        Shape.hvertex_fill_color = QtGui.QColor(
-            *self._config["shape"]["hvertex_fill_color"]
-        )
+        Shape.select_line_color = QtGui.QColor(*self._config["shape"]["select_line_color"])
+        Shape.select_fill_color = QtGui.QColor(*self._config["shape"]["select_fill_color"])
+        Shape.vertex_fill_color = QtGui.QColor(*self._config["shape"]["vertex_fill_color"])
+        Shape.hvertex_fill_color = QtGui.QColor(*self._config["shape"]["hvertex_fill_color"])
 
-        super(MainWindow, self).__init__()
-        self.setWindowTitle(__appname__)
+        super().__init__()
+
+        """ uo_a7: 去除边框 """
+        # self.setWindowFlags(Qt.FramelessWindowHint)
+        """ ^^^^^^^^^^^^^^^ """
+
+        self.setWindowTitle(__app_name__)
 
         # Whether we need to save or not.
         self.dirty = False
@@ -108,14 +88,16 @@ class MainWindow(QtWidgets.QMainWindow):
         self.labelList = LabelListWidget()
         self.lastOpenDir = None
 
+        """ *********************************** Flags Dock *********************************** """
         self.flag_dock = self.flag_widget = None
         self.flag_dock = QtWidgets.QDockWidget(self.tr("Flags"), self)
         self.flag_dock.setObjectName("Flags")
         self.flag_widget = QtWidgets.QListWidget()
-        if config["flags"]:
-            self.loadFlags({k: False for k in config["flags"]})
+        if self._config["flags"]:
+            self.loadFlags({k: False for k in self._config["flags"]})
         self.flag_dock.setWidget(self.flag_widget)
         self.flag_widget.itemChanged.connect(self.setDirty)
+        """ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Flags Dock ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ """
 
         self.labelList.itemSelectionChanged.connect(self.labelSelectionChanged)
         self.labelList.itemDoubleClicked.connect(self.editLabel)
@@ -723,17 +705,17 @@ class MainWindow(QtWidgets.QMainWindow):
             fitWidth,
         )
 
-        self.statusBar().showMessage(self.tr("%s started.") % __appname__)
+        self.statusBar().showMessage(self.tr("%s started.") % __app_name__)
         self.statusBar().show()
 
-        if output_file is not None and self._config["auto_save"]:
-            logger.warn(
-                "If `auto_save` argument is True, `output_file` argument "
-                "is ignored and output filename is automatically "
-                "set as IMAGE_BASENAME.json."
-            )
-        self.output_file = output_file
-        self.output_dir = output_dir
+        # if output_file is not None and self._config["auto_save"]:
+        #     logger.warn(
+        #         "If `auto_save` argument is True, `output_file` argument "
+        #         "is ignored and output filename is automatically "
+        #         "set as IMAGE_BASENAME.json."
+        #     )
+        self.output_file = None
+        self.output_dir = None
 
         # Application state.
         self.image = QtGui.QImage()
@@ -750,13 +732,14 @@ class MainWindow(QtWidgets.QMainWindow):
             Qt.Vertical: {},
         }  # key=filename, value=scroll_value
 
-        if filename is not None and osp.isdir(filename):
-            self.importDirImages(filename, load=False)
-        else:
-            self.filename = filename
+        # if filename is not None and osp.isdir(filename):
+        #     self.importDirImages(filename, load=False)
+        # else:
+        #     self.filename = filename
+        self.filename = None
 
-        if config["file_search"]:
-            self.fileSearch.setText(config["file_search"])
+        if self._config["file_search"]:
+            self.fileSearch.setText(self._config["file_search"])
             self.fileSearchChanged()
 
         # XXX: Could be completely declarative.
@@ -830,6 +813,11 @@ class MainWindow(QtWidgets.QMainWindow):
         utils.addActions(self.menus.edit, actions + self.actions.editMenu)
 
     def setDirty(self):
+        """
+        有改动发生后，
+            1. 如果设置了 "auto_save"，则自动保存，返回
+            2. 否则，设置标题提示有改动，设置相关按钮可使用
+        """
         if self._config["auto_save"] or self.actions.saveAuto.isChecked():
             label_file = osp.splitext(self.imagePath)[0] + ".json"
             if self.output_dir:
@@ -840,7 +828,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.dirty = True
         self.actions.save.setEnabled(True)
         self.actions.undo.setEnabled(self.canvas.isShapeRestorable)
-        title = __appname__
+        title = __app_name__
         if self.filename is not None:
             title = "{} - {}*".format(title, self.filename)
         self.setWindowTitle(title)
@@ -854,7 +842,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.actions.createLineMode.setEnabled(True)
         self.actions.createPointMode.setEnabled(True)
         self.actions.createLineStripMode.setEnabled(True)
-        title = __appname__
+        title = __app_name__
         if self.filename is not None:
             title = "{} - {}".format(title, self.filename)
         self.setWindowTitle(title)
@@ -1680,7 +1668,7 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         filename = QtWidgets.QFileDialog.getOpenFileName(
             self,
-            self.tr("%s - Choose Image or Label file") % __appname__,
+            self.tr("%s - Choose Image or Label file") % __app_name__,
             path,
             filters,
         )
@@ -1699,7 +1687,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         output_dir = QtWidgets.QFileDialog.getExistingDirectory(
             self,
-            self.tr("%s - Save/Load Annotations in Directory") % __appname__,
+            self.tr("%s - Save/Load Annotations in Directory") % __app_name__,
             default_output_dir,
             QtWidgets.QFileDialog.ShowDirsOnly
             | QtWidgets.QFileDialog.DontResolveSymlinks,
@@ -1743,7 +1731,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._saveFile(self.saveFileDialog())
 
     def saveFileDialog(self):
-        caption = self.tr("%s - Choose File") % __appname__
+        caption = self.tr("%s - Choose File") % __app_name__
         filters = self.tr("Label files (*%s)") % LabelFile.suffix
         if self.output_dir:
             dlg = QtWidgets.QFileDialog(
@@ -1909,7 +1897,7 @@ class MainWindow(QtWidgets.QMainWindow):
         targetDirPath = str(
             QtWidgets.QFileDialog.getExistingDirectory(
                 self,
-                self.tr("%s - Open Directory") % __appname__,
+                self.tr("%s - Open Directory") % __app_name__,
                 defaultOpenDirPath,
                 QtWidgets.QFileDialog.ShowDirsOnly
                 | QtWidgets.QFileDialog.DontResolveSymlinks,

@@ -9,7 +9,7 @@ if os.name == "nt":  # Windows
 
     colorama.init()
 
-from . import __appname__
+from labelme import __app_name__
 
 
 COLORS = {
@@ -68,4 +68,4 @@ class ColoredLogger(logging.Logger):
 
 
 logging.setLoggerClass(ColoredLogger)
-logger = logging.getLogger(__appname__)
+logger = logging.getLogger(__app_name__)
